@@ -1,0 +1,23 @@
+--- a/tools/cooja/apps/mspsim/build.xml  2025-05-01 11:22:39.672010613 +0200
++++ b/tools/cooja/apps/mspsim/build.xml  2025-05-05 00:02:40.536234977 +0200
+@@ -46,7 +46,7 @@
+ 
+   <target name="compile" depends="init,mspsim,coffee">
+     <javac srcdir="${src}" destdir="${build}" debug="on"
+-           includeantruntime="false">
++           includeantruntime="false" encoding="iso-8859-1">
+       <classpath>
+         <pathelement location="${mspsim_jar}"/>
+         <pathelement location="${coffee_jar}"/>
+
+--- a/tools/mspsim/build.xml  2025-05-01 11:23:21.963760833 +0200
++++ b/tools/mspsim/build.xml  2025-05-05 00:09:44.246639506 +0200
+@@ -27,7 +27,7 @@
+ 
+   <target name="compile" depends="init" description="compile the source">
+     <javac srcdir="${src}" destdir="${build}" classpathref="classpath"
+-           debug="${javac.debug}" includeantruntime="false">
++           debug="${javac.debug}" includeantruntime="false" encoding="iso-8859-1">
+       <compilerarg value="-Xlint:unchecked"/>
+       <compilerarg value="-deprecation"/>
+       <exclude name="tests/**" />
