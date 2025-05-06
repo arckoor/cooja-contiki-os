@@ -106,9 +106,9 @@
           '';
         };
 
-        msp430-gcc = gcc4-pkgs.stdenv.mkDerivation rec {
+        msp430-gcc-unwrapped = gcc4-pkgs.stdenv.mkDerivation rec {
           version = "4.6.3";
-          name = "msp430-gcc-${version}";
+          name = "msp430-gcc-unwrapped-${version}";
           src = pkgs.fetchzip {
             url = "https://ftp.gnu.org/pub/gnu/gcc/gcc-4.6.3/gcc-4.6.3.tar.bz2";
             hash = "sha256-RIvXckvIyuaNB1i+ZOPhcWAU7YKgYBj2meHEBkjT/O8=";
@@ -147,7 +147,7 @@
           enableParallelBuilding = true;
         };
 
-        msp430-mcu = pkgs.mkDerivation rec {
+        msp430-mcu = pkgs.stdenvNoCC.mkDerivation rec {
           pname = "msp430-mcu";
           version = "20120406";
           src = pkgs.fetchzip {
@@ -163,8 +163,8 @@
         };
 
         msp430-libc = gcc4-pkgs.stdenv.mkDerivation rec {
-          pname = "msp430-libc";
           version = "20120224";
+          name = "msp430-libc-${version}";
           src = pkgs.fetchzip {
             url = "https://sourceforge.net/projects/mspgcc/files/msp430-libc/msp430-libc-${version}.zip";
             hash = "sha256-NTLQpFgI1rFSQule/lBLf+ftQ5rsx8HiakQcZuaRvLI=";
@@ -172,7 +172,7 @@
           nativeBuildInputs = [
             msp430-binutils
             msp430-binutils-symlinked
-            msp430-gcc
+            msp430-gcc-unwrapped
           ];
           makeFlags = ["MAKEINFO=true"];
           buildPhase = ''
@@ -182,7 +182,7 @@
           enableParallelBuilding = true;
         };
 
-        msp430-lib = pkgs.mkDerivation {
+        msp430-lib = pkgs.stdenvNoCC.mkDerivation {
           pname = "msp430-libs";
           version = "1.0";
           nativeBuildInputs = [
@@ -202,26 +202,26 @@
           '';
         };
 
-        msp430-gcc-wrapped = pkgs.mkDerivation {
-          pname = "msp430-gcc-wrapped";
+        msp430-gcc = pkgs.stdenvNoCC.mkDerivation {
+          pname = "msp430-gcc";
           version = "1.0";
           nativeBuildInputs = with pkgs; [
-            msp430-gcc
+            msp430-gcc-unwrapped
             msp430-lib
             makeWrapper
           ];
           dontUnpack = true;
           installPhase = ''
             mkdir -p $out/bin
-            makeWrapper ${msp430-gcc}/bin/msp430-gcc $out/bin/msp430-gcc \
+            makeWrapper ${msp430-gcc-unwrapped}/bin/msp430-gcc $out/bin/msp430-gcc \
               --add-flags "-I${msp430-lib}/include -L${msp430-lib}/lib -L${msp430-lib}/lib/ldscripts/msp430f1611" \
               --set LC_ALL C
           '';
         };
 
-        msp430-gdb = gcc4-pkgs.stdenv.mkDerivation rec {
+        msp430-gdb-unwrapped = gcc4-pkgs.stdenv.mkDerivation rec {
           version = "7.2a";
-          name = "msp430-gdb-${version}";
+          name = "msp430-gdb-unwrapped-${version}";
           src = pkgs.fetchzip {
             url = "https://ftp.gnu.org/pub/gnu/gdb/gdb-7.2a.tar.bz2";
             hash = "sha256-En1c84Y6elRfjOeQKrTrrcihgxTQKTJirGMnXi8wGW0=";
@@ -250,14 +250,23 @@
           configureFlags = [
             "--target=msp430"
           ];
-          # TODO this wraps wrong, make an extra derivation
-          postInstall = ''
-            mv $out/bin/msp430-gdb $out/bin/msp430-gdb-unwrapped
-            makeWrapper $out/bin/msp430-gdb-unwrapped $out/bin/msp430-gdb \
-              --set LC_ALL C
-          '';
           enableParallelBuilding = true;
           NIX_CFLAGS_COMPILE = "-Wno-error -Wno-error=format-security";
+        };
+
+        msp430-gdb = pkgs.stdenvNoCC.mkDerivation {
+          pname = "msp430-gdb";
+          version = "7.2a";
+          nativeBuildInputs = with pkgs; [
+            msp430-gdb-unwrapped
+            makeWrapper
+          ];
+          dontUnpack = true;
+          installPhase = ''
+            mkdir -p $out/bin
+            makeWrapper ${msp430-gdb-unwrapped}/bin/msp430-gdb $out/bin/msp430-gdb \
+              --set LC_ALL C
+          '';
         };
 
         cooja = pkgs.stdenv.mkDerivation rec {
@@ -311,7 +320,7 @@
           packages = with pkgs;
             [
               ccache
-              msp430-gcc-wrapped
+              msp430-gcc
               msp430-binutils
               msp430-binutils-symlinked
               msp430-gdb
