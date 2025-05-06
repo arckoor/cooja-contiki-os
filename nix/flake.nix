@@ -2,7 +2,6 @@
   description = "Cooja with msp430-gcc";
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    lib-nixpkgs.url = "github:NixOS/nixpkgs/5ed627539ac84809c78b2dd6d26a5cebeb5ae269";
     systems.url = "github:nix-systems/default";
     nixpkgs-python = {
       url = "github:cachix/nixpkgs-python";
@@ -16,7 +15,6 @@
 
   outputs = {
     nixpkgs,
-    lib-nixpkgs,
     flake-utils,
     nixpkgs-python,
     ...
@@ -26,30 +24,10 @@
         pkgs = import nixpkgs {
           inherit system;
         };
-        lib-pkgs = import lib-nixpkgs {
-          inherit system;
-        };
-
         gcc4-pkgs = import (fetchTarball {
           url = "https://github.com/NixOS/nixpkgs/archive/0c66dbaee6647abfb4d2774588a0cf0ad8d4f02b.tar.gz";
           sha256 = "sha256:040m9qprszi9x9zbkdjqf35pp7nx7jpama9kicv5ix4pxiiw5ap4";
         }) {inherit system;};
-
-        mkScript = name: text: (pkgs.writeShellScriptBin name text);
-
-        shellScripts = [
-          (mkScript "init" ''
-            cd ../
-            git clone https://github.com/contiki-os/contiki.git --recurse-submodules
-            cd contiki/tools/cooja
-            ant compile
-          '')
-
-          (mkScript "run" ''
-            cd ../contiki/tools/cooja
-            ant run
-          '')
-        ];
 
         msp430-patches = pkgs.stdenvNoCC.mkDerivation rec {
           pname = "msp430-patches";
@@ -90,8 +68,7 @@
         };
 
         msp430-binutils-symlinked = pkgs.stdenvNoCC.mkDerivation {
-          pname = "msp430-bintuils-sl";
-          version = "2.21.1";
+          name = "msp430-bintuils-symlinked";
           nativeBuildInputs = [
             msp430-binutils
           ];
@@ -135,15 +112,7 @@
           configureFlags = [
             "--target=msp430"
             "--enable-languages=c,c++"
-            # "--with-gmp=${gcc4-pkgs.gmp}"
-            # "--with-mpfr=${gcc4-pkgs.mpfr}"
-            # "--with-mpc=${gcc4-pkgs.mpc}"
           ];
-          postInstall = ''
-            # mv $out/bin/msp430-gcc $out/bin/msp430-gcc-unwrapped
-            # makeWrapper $out/bin/msp430-gcc-unwrapped $out/bin/msp430-gcc \
-            #   --set LC_ALL C
-          '';
           enableParallelBuilding = true;
         };
 
@@ -162,7 +131,7 @@
           '';
         };
 
-        msp430-libc = gcc4-pkgs.stdenv.mkDerivation rec {
+        msp430-libc = pkgs.stdenvNoCC.mkDerivation rec {
           version = "20120224";
           name = "msp430-libc-${version}";
           src = pkgs.fetchzip {
@@ -269,6 +238,20 @@
           '';
         };
 
+        contiki-os-source = pkgs.stdenv.mkDerivation {
+          name = "contiki-os-source";
+          src = pkgs.fetchFromGitHub {
+            owner = "contiki-os";
+            repo = "contiki";
+            rev = "32b5b17f674232867c22916bb2e2534c8e9a92ff";
+            hash = "sha256-rMSDFbYxtXhCsWGXphjb1qoI0HRU5wet9QUQV9NCySI=";
+          };
+          installPhase = ''
+            mkdir -p $out
+            cp -r * $out
+          '';
+        };
+
         cooja = pkgs.stdenv.mkDerivation rec {
           pname = "cooja";
           version = "latest";
@@ -317,20 +300,20 @@
         };
       in {
         devShells.default = pkgs.mkShell {
-          packages = with pkgs;
-            [
-              ccache
-              msp430-gcc
-              msp430-binutils
-              msp430-binutils-symlinked
-              msp430-gdb
-              rlwrap
-              cooja
-              msp430-mcu
-              msp430-libc
-            ]
-            ++ shellScripts;
+          packages = with pkgs; [
+            ccache
+            msp430-gcc
+            msp430-binutils
+            msp430-binutils-symlinked
+            msp430-gdb
+            rlwrap
+            msp430-mcu
+            msp430-libc
+            cooja
+            contiki-os-source
+          ];
           shellHook = ''
+            export CONTIKI=${contiki-os-source}
           '';
         };
       }
