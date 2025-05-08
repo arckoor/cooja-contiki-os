@@ -3,10 +3,6 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     systems.url = "github:nix-systems/default";
-    nixpkgs-python = {
-      url = "github:cachix/nixpkgs-python";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     flake-utils = {
       url = "github:numtide/flake-utils";
       inputs.systems.follows = "systems";
@@ -16,7 +12,6 @@
   outputs = {
     nixpkgs,
     flake-utils,
-    nixpkgs-python,
     ...
   } @ inputs:
     flake-utils.lib.eachDefaultSystem (
@@ -83,27 +78,83 @@
           '';
         };
 
-        msp430-gcc-unwrapped = gcc4-pkgs.stdenv.mkDerivation rec {
+        # msp430-gcc SETUP ----------------------------------------------------------------------
+
+        msp430-mcu = pkgs.stdenv.mkDerivation rec {
+          pname = "msp430-mcu";
+          version = "20120406";
+          src = pkgs.fetchurl {
+            url = "https://sourceforge.net/projects/mspgcc/files/msp430mcu/msp430mcu-${version}.tar.bz2";
+            hash = "sha256-BjcBTo5Ql0bD9t+OHWW3hncNFis6C4ZUi992rDECyW4=";
+          };
+          installPhase = ''
+
+            PREFIX=$out
+            MSP430MCU_ROOT=./
+            UPSTREAM=$MSP430MCU_ROOT/upstream
+            ANALYSIS=$MSP430MCU_ROOT/analysis
+            SCRIPTS=$MSP430MCU_ROOT/scripts
+            VERSION=`cat $MSP430MCU_ROOT/.version`
+            UPSTREAM_VERSION=`cat $MSP430MCU_ROOT/upstream/.version`
+
+            BINPATH=$PREFIX/bin
+            INCPATH=$PREFIX/msp430/include
+            LIBPATH=$PREFIX/msp430/lib
+
+            mkdir -p $INCPATH $LIBPATH
+
+            # Upstream headers
+            install -p -m 0644 $UPSTREAM/*.h $INCPATH
+
+            # Local override headers
+            install -p -m 0644 $MSP430MCU_ROOT/include/*.h $INCPATH
+
+            # Override msp430.h to accommodate legacy MSPGCC MCU identifiers
+            install -p -m 0644 $ANALYSIS/msp430.h $INCPATH
+
+            # MCU-specific data for GCC driver program
+            install -p -m 0644 $ANALYSIS/msp430mcu.spec $LIBPATH
+
+            # Install MCU-specific memory and periph maps
+            cp -pr $ANALYSIS/ldscripts $LIBPATH
+            chmod -R og+rX $LIBPATH/ldscripts
+
+            # Install utility that tells where everything got installed
+            #cat bin/msp430mcu-config.in \
+            #| sed \
+            #    -e 's!@PREFIX@!'"$PREFIX"'!g' \
+            #    -e 's!@SCRIPTPATH@!'"$LIBPATH/ldscripts"'!g' \
+            #    -e 's!@INCPATH@!'"$INCPATH"'!g' \
+            #    -e 's!@VERSION@!'"$VERSION"'!g' \
+            #    -e 's!@UPSTREAM_VERSION@!'"$UPSTREAM_VERSION"'!g' \
+            #> $BINPATH/msp430mcu-config \
+            #&& chmod 0755 $BINPATH/msp430mcu-config
+          '';
+        };
+
+        msp430-gcc-unwrapped = pkgs.stdenv.mkDerivation rec {
           version = "4.6.3";
           name = "msp430-gcc-unwrapped-${version}";
-          src = pkgs.fetchzip {
+          src = pkgs.fetchurl {
             url = "https://ftp.gnu.org/pub/gnu/gcc/gcc-4.6.3/gcc-4.6.3.tar.bz2";
-            hash = "sha256-RIvXckvIyuaNB1i+ZOPhcWAU7YKgYBj2meHEBkjT/O8=";
+            hash = "sha256-6PWFPU7sL166+Kcq5NU8Q2qs+YFTskmfhjW0jEcYoJM=";
           };
           patches = [
             "${msp430-patches}/msp430-gcc-4.6.3-20120406.patch"
+            ./patches/gcc.patch
           ];
-          nativeBuildInputs = with gcc4-pkgs; [
+          nativeBuildInputs = with pkgs; [
             gmp
             mpfr
-            mpc
+            libmpc
+
             flex
             bison
             texinfo
-            gcc44
             msp430-binutils
           ];
-          makeFlags = ["MAKEINFO=true"];
+          hardeningDisable = ["all"];
+          makeFlags = ["MAKEINFO=true" "CFLAGS=\"-g\""];
           preConfigure = ''
             mkdir build
             cd build
@@ -111,32 +162,21 @@
           configureScript = "../configure";
           configureFlags = [
             "--target=msp430"
-            "--enable-languages=c,c++"
+            "--enable-languages=c"
+            "--disable-nls"
+            "--disable-libssp"
           ];
           enableParallelBuilding = true;
+          NIX_CFLAGS_COMPILE = "-Wno-error=format-security";
         };
 
-        msp430-mcu = pkgs.stdenvNoCC.mkDerivation rec {
-          pname = "msp430-mcu";
-          version = "20120406";
-          src = pkgs.fetchzip {
-            url = "https://sourceforge.net/projects/mspgcc/files/msp430mcu/msp430mcu-${version}.zip";
-            hash = "sha256-da7RmEjbRIWw+nYg2k1aobspex/GpYGJS1bwm/7t4Ak=";
-          };
-          installPhase = ''
-            mkdir -p $out/upstream $out/lib $out/analysis
-            cp upstream/*h $out/upstream
-            cp include/*.h $out/lib
-            cp -r analysis/* $out/analysis
-          '';
-        };
 
-        msp430-libc = pkgs.stdenvNoCC.mkDerivation rec {
+        msp430-libc = pkgs.stdenv.mkDerivation rec {
           version = "20120224";
           name = "msp430-libc-${version}";
-          src = pkgs.fetchzip {
-            url = "https://sourceforge.net/projects/mspgcc/files/msp430-libc/msp430-libc-${version}.zip";
-            hash = "sha256-NTLQpFgI1rFSQule/lBLf+ftQ5rsx8HiakQcZuaRvLI=";
+          src = pkgs.fetchurl {
+            url = "https://sourceforge.net/projects/mspgcc/files/msp430-libc/msp430-libc-${version}.tar.bz2";
+            hash = "sha256-tnoziBqmtFbFyZ3qXqZViSRV/eExfVvagY6cbuNKP4I=";
           };
           nativeBuildInputs = [
             msp430-binutils
@@ -151,7 +191,7 @@
           enableParallelBuilding = true;
         };
 
-        msp430-lib = pkgs.stdenvNoCC.mkDerivation {
+        msp430-lib = pkgs.stdenv.mkDerivation {
           pname = "msp430-libs";
           version = "1.0";
           nativeBuildInputs = [
@@ -160,20 +200,19 @@
           ];
           dontUnpack = true;
           installPhase = ''
-            mkdir -p $out/include $out/lib
-            cp ${msp430-mcu}/upstream/* $out/include
-            cp ${msp430-mcu}/lib/* $out/include
-            cp -r ${msp430-mcu}/analysis/ldscripts  $out/lib
-            cp ${msp430-mcu}/analysis/msp430mcu.spec  $out/lib
 
-            cp -r ${msp430-libc}/msp430/lib/* $out/lib
-            cp -r ${msp430-libc}/msp430/include/* $out/include
+            mkdir -p $out/include
+            mkdir -p $out/lib
+
+            cp -r ${msp430-mcu}/msp430/* $out/
+            cp -r ${msp430-libc}/msp430/* $out/
+
           '';
         };
 
-        msp430-gcc = pkgs.stdenvNoCC.mkDerivation {
+        msp430-gcc = pkgs.stdenv.mkDerivation {
           pname = "msp430-gcc";
-          version = "1.0";
+          version = msp430-gcc-unwrapped.version;
           nativeBuildInputs = with pkgs; [
             msp430-gcc-unwrapped
             msp430-lib
@@ -182,11 +221,25 @@
           dontUnpack = true;
           installPhase = ''
             mkdir -p $out/bin
+            mkdir -p $out/include
+            mkdir -p $out/lib/gcc
+            mkdir -p $out/libexec/
+
+            cp -r ${msp430-gcc-unwrapped}/lib/* $out/lib/
+            cp -r ${msp430-gcc-unwrapped}/libexec/* $out/libexec/
+
+            cp -r ${msp430-lib}/* $out
+
+            cp ${msp430-lib}/lib/msp430mcu.spec $out/lib/gcc
+
             makeWrapper ${msp430-gcc-unwrapped}/bin/msp430-gcc $out/bin/msp430-gcc \
-              --add-flags "-I${msp430-lib}/include -L${msp430-lib}/lib -L${msp430-lib}/lib/ldscripts/msp430f1611" \
-              --set LC_ALL C
-          '';
+              --add-flags "-I$out/include -L$out/lib -L$out/lib/ldscripts/msp430f1611" \
+              --set LC_ALL C \
+              --set GCC_EXEC_PREFIX $out/lib/gcc/
+          ''; 
         };
+
+        # msp430-gdb SETUP ----------------------------------------------------------------------
 
         msp430-gdb-unwrapped = gcc4-pkgs.stdenv.mkDerivation rec {
           version = "7.2a";
@@ -243,9 +296,30 @@
           src = pkgs.fetchFromGitHub {
             owner = "contiki-os";
             repo = "contiki";
-            rev = "32b5b17f674232867c22916bb2e2534c8e9a92ff";
+            rev = "3.0";
             hash = "sha256-rMSDFbYxtXhCsWGXphjb1qoI0HRU5wet9QUQV9NCySI=";
           };
+          patches = [
+            ./patches/cooja.patch
+          ];
+          installPhase = ''
+            mkdir -p $out
+            cp -r * $out
+          '';
+        };
+
+        mspsim-source = pkgs.stdenv.mkDerivation {
+          name = "mspsim-source";
+          src = pkgs.fetchFromGitHub {
+            owner = "contiki-os";
+            repo = "mspsim";
+            rev = "47ae45cb0f36337115e32adb2a5ba0bf6e1e4437";
+            hash = "sha256-Notvul48WXj6JxciFmSUVHM2rguVG2t2HO1t8PBipiI=";
+          };
+          prePatch = ''
+            ls -lafh
+          '';
+          phases = ["unpackPhase" "prePatch" "patchPhase" "installPhase" ];
           installPhase = ''
             mkdir -p $out
             cp -r * $out
@@ -261,24 +335,19 @@
             rev = "32b5b17f674232867c22916bb2e2534c8e9a92ff";
             hash = "sha256-rMSDFbYxtXhCsWGXphjb1qoI0HRU5wet9QUQV9NCySI=";
           };
-          mspsim = pkgs.fetchFromGitHub {
-            owner = "contiki-os";
-            repo = "mspsim";
-            rev = "47ae45cb0f36337115e32adb2a5ba0bf6e1e4437";
-            hash = "sha256-Notvul48WXj6JxciFmSUVHM2rguVG2t2HO1t8PBipiI=";
-          };
           nativeBuildInputs = with pkgs; [
             jdk8
             ant
             makeWrapper
+            mspsim-source
           ];
+          prePatch = ''
+            cp -r ${mspsim-source}/* tools/mspsim
+          '';
           patches = [
             ./patches/cooja.patch
             ./patches/mspsim-build.patch
           ];
-          prePatch = ''
-            cp -r ${mspsim}/* tools/mspsim
-          '';
           buildPhase = ''
             cd tools/cooja
             ant jar
