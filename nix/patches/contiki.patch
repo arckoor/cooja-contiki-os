@@ -12,12 +12,22 @@
 
 --- a/tools/mspsim/build.xml  2025-05-01 11:23:21.963760833 +0200
 +++ b/tools/mspsim/build.xml  2025-05-05 00:09:44.246639506 +0200
-@@ -27,7 +27,7 @@
+@@ -24,6 +24,6 @@
  
    <target name="compile" depends="init" description="compile the source">
-     <javac srcdir="${src}" destdir="${build}" classpathref="classpath"
--           debug="${javac.debug}" includeantruntime="false">
-+           debug="${javac.debug}" includeantruntime="false" encoding="iso-8859-1">
-       <compilerarg value="-Xlint:unchecked"/>
-       <compilerarg value="-deprecation"/>
-       <exclude name="tests/**" />
+     <javac srcdir="${src}" destdir="${build}" classpathref="classpath" debug="${javac.debug}"
+-      includeantruntime="false"/>
++      includeantruntime="false" encoding="iso-8859-1"/>
+   </target>
+
+--- a/platform/sky/Makefile.sky  2025-05-08 17:42:03.087286391 +0200
++++ b/platform/sky/Makefile.sky  2025-05-08 17:42:25.519460600 +0200
+@@ -2,7 +2,7 @@
+ 
+ CONTIKI_TARGET_SOURCEFILES += contiki-sky-platform.c \
+ 	sht11.c sht11-sensor.c light-sensor.c battery-sensor.c \
+-	button-sensor.c radio-sensor.c
++	button-sensor.c radio-sensor.c temperature-sensor.c
+ 
+ ifndef SMALL
+ SMALL=1
