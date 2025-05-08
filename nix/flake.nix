@@ -31,10 +31,10 @@
 
         msp430-patches = pkgs.stdenvNoCC.mkDerivation rec {
           pname = "msp430-patches";
-          version = "20120406";
+          version = "20120911";
           src = pkgs.fetchzip {
-            url = "https://sourceforge.net/projects/mspgcc/files/mspgcc/mspgcc-${version}.zip";
-            hash = "sha256-gVIURNjW4yq6ki/2x8uvty2OwlJ5Kv4FDcqBqdiPb+0=";
+            url = "https://sourceforge.net/projects/mspgcc/files/mspgcc/DEVEL-4.7.x/mspgcc-20120911.tar.bz2";
+            hash = "sha256-BWFF4kWrJrSEhtcDQ+jFjVj/j4Zec/uanarnFlojieA=";
           };
           installPhase = ''
             mkdir -p $out
@@ -42,27 +42,41 @@
           '';
         };
 
-        msp430-binutils = gcc4-pkgs.stdenv.mkDerivation rec {
-          version = "2.21.1";
-          name = "msp430-binutils-${version}";
+        gcc-patches = pkgs.stdenvNoCC.mkDerivation rec {
+          name = "gcc-patches";
+          src = pkgs.fetchzip {
+            url = "https://raw.githubusercontent.com/tgtakaoka/homebrew-mspgcc/master/patches/gcc-4.7.0-patches.tar.xz";
+            hash = "sha256-z7E8fEnaBJlKAFhRkhV7KeVDYIHlNNL10TNQZUdUGFY=";
+            stripRoot = false;
+          };
+          installPhase = ''
+            mkdir -p $out
+            cp *.patch $out
+          '';
+        };
+
+        msp430-binutils = pkgs.stdenv.mkDerivation rec {
+          version = "2.22";
+          pname = "msp430-binutils";
           src = pkgs.fetchurl {
-            url = "https://ftp.gnu.org/pub/gnu/binutils/binutils-2.21.1a.tar.bz2";
-            hash = "sha256-zez6afAqp7BfvN9njjMTcVHzYTE7Lz5Iq6kl9k6r9lQ=";
+            url = "https://ftp.gnu.org/gnu/binutils/binutils-${version}.tar.bz2";
+            hash = "sha256-bHr47RyM+bS51ub+CaPh09R5/mOYS6i5smvzVrYxPKk=";
           };
           patches = [
-            "${msp430-patches}/msp430-binutils-2.21.1a-20120406.patch"
+            "${msp430-patches}/msp430-binutils-${version}-20120911.patch"
           ];
-          nativeBuildInputs = with gcc4-pkgs; [
+          nativeBuildInputs = with pkgs; [
             gmp
             mpfr
-            mpc
+            libmpc
             flex
             bison
-            texinfo
           ];
           makeFlags = ["MAKEINFO=true"];
           configureFlags = [
             "--target=msp430"
+            "--disable-nls"
+            "--disable-werror"
           ];
           enableParallelBuilding = true;
         };
@@ -83,24 +97,25 @@
           '';
         };
 
-        msp430-gcc-unwrapped = gcc4-pkgs.stdenv.mkDerivation rec {
-          version = "4.6.3";
+        msp430-gcc-unwrapped = pkgs.stdenv.mkDerivation rec {
+          version = "4.7.0";
           name = "msp430-gcc-unwrapped-${version}";
           src = pkgs.fetchzip {
-            url = "https://ftp.gnu.org/pub/gnu/gcc/gcc-4.6.3/gcc-4.6.3.tar.bz2";
-            hash = "sha256-RIvXckvIyuaNB1i+ZOPhcWAU7YKgYBj2meHEBkjT/O8=";
+            url = "http://ftp.gnu.org/gnu/gcc/gcc-${version}/gcc-${version}.tar.bz2";
+            hash = "sha256-bXYbSq1z3bVKmfdV/uR+cn9Yg+Y0AxZMkXehLpYnx48=";
           };
           patches = [
-            "${msp430-patches}/msp430-gcc-4.6.3-20120406.patch"
+            "${msp430-patches}/msp430-gcc-${version}-20120911.patch"
+            "${gcc-patches}/gcc-4.7.0_PR-54638.patch"
+            "${gcc-patches}/gcc-4.7.0_gperf.patch"
+            "${gcc-patches}/gcc-4.7.0_libiberty-multilib.patch"
           ];
-          nativeBuildInputs = with gcc4-pkgs; [
+          nativeBuildInputs = with pkgs; [
             gmp
             mpfr
-            mpc
+            libmpc
             flex
             bison
-            texinfo
-            gcc44
             msp430-binutils
           ];
           makeFlags = ["MAKEINFO=true"];
@@ -111,16 +126,19 @@
           configureScript = "../configure";
           configureFlags = [
             "--target=msp430"
-            "--enable-languages=c,c++"
+            "--enable-languages=c"
+            "--disable-nls"
+            "--disable-werror"
           ];
           enableParallelBuilding = true;
+          NIX_CFLAGS_COMPILE = "-Wno-error -Wno-format-security -Wno-incompatible-pointer-types -g";
         };
 
         msp430-mcu = pkgs.stdenvNoCC.mkDerivation rec {
           pname = "msp430-mcu";
-          version = "20120406";
+          version = "20130321";
           src = pkgs.fetchzip {
-            url = "https://sourceforge.net/projects/mspgcc/files/msp430mcu/msp430mcu-${version}.zip";
+            url = "https://sourceforge.net/projects/mspgcc/files/msp430mcu/msp430mcu-${version}.tar.bz2";
             hash = "sha256-da7RmEjbRIWw+nYg2k1aobspex/GpYGJS1bwm/7t4Ak=";
           };
           installPhase = ''
@@ -132,16 +150,26 @@
         };
 
         msp430-libc = pkgs.stdenvNoCC.mkDerivation rec {
-          version = "20120224";
+          version = "20120716";
           name = "msp430-libc-${version}";
           src = pkgs.fetchzip {
-            url = "https://sourceforge.net/projects/mspgcc/files/msp430-libc/msp430-libc-${version}.zip";
+            url = "https://sourceforge.net/projects/mspgcc/files/msp430-libc/msp430-libc-${version}.tar.bz2";
             hash = "sha256-NTLQpFgI1rFSQule/lBLf+ftQ5rsx8HiakQcZuaRvLI=";
           };
           nativeBuildInputs = [
             msp430-binutils
             msp430-binutils-symlinked
             msp430-gcc-unwrapped
+            msp430-mcu
+          ];
+          prePatch = ''
+            ls -laFh
+            ls -laFh src
+            ls -laFh src/stdlib
+            cat src/stdlib/malloc.c
+          '';
+          patches = [
+            ./patches/libc.patch
           ];
           makeFlags = ["MAKEINFO=true"];
           buildPhase = ''
@@ -152,8 +180,7 @@
         };
 
         msp430-lib = pkgs.stdenvNoCC.mkDerivation {
-          pname = "msp430-libs";
-          version = "1.0";
+          name = "msp430-libs";
           nativeBuildInputs = [
             msp430-libc
             msp430-mcu
@@ -163,8 +190,8 @@
             mkdir -p $out/include $out/lib
             cp ${msp430-mcu}/upstream/* $out/include
             cp ${msp430-mcu}/lib/* $out/include
-            cp -r ${msp430-mcu}/analysis/ldscripts  $out/lib
-            cp ${msp430-mcu}/analysis/msp430mcu.spec  $out/lib
+            cp -r ${msp430-mcu}/analysis/ldscripts $out/lib
+            cp ${msp430-mcu}/analysis/msp430mcu.spec $out/lib
 
             cp -r ${msp430-libc}/msp430/lib/* $out/lib
             cp -r ${msp430-libc}/msp430/include/* $out/include
@@ -173,7 +200,7 @@
 
         msp430-gcc = pkgs.stdenvNoCC.mkDerivation {
           pname = "msp430-gcc";
-          version = "1.0";
+          version = msp430-gcc-unwrapped.version;
           nativeBuildInputs = with pkgs; [
             msp430-gcc-unwrapped
             msp430-lib
@@ -305,7 +332,7 @@
             msp430-gcc
             msp430-binutils
             msp430-binutils-symlinked
-            msp430-gdb
+            # msp430-gdb
             rlwrap
             msp430-mcu
             msp430-libc

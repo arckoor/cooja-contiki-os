@@ -1,0 +1,13 @@
+--- a/src/stdlib/malloc.c  2012-07-16 21:32:41.000000000 +0200
++++ b/src/stdlib/malloc.c  2025-05-07 18:31:57.787076107 +0200
+@@ -21,7 +21,9 @@
+         once = 1;
+         *heap_top = 0xFFFE;
+     }
+-    GET_HEAP_BOTTOM (heap_bottom);
++    uint16_t heap_bottom_raw;
++    GET_HEAP_BOTTOM(heap_bottom_raw);
++    heap_bottom = (size_t *)heap_bottom_raw;
+     heap_bottom -= 20;
+     size = (size+1) >> 1;       /* round to 2 */
+     do
