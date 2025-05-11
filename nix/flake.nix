@@ -111,8 +111,8 @@
           NIX_CFLAGS_COMPILE = "-Wno-error=format-security";
         };
 
-        msp430-mcu = pkgs.stdenvNoCC.mkDerivation rec {
-          pname = "msp430-mcu";
+        msp430mcu = pkgs.stdenvNoCC.mkDerivation rec {
+          pname = "msp430mcu";
           version = "20120406";
           src = pkgs.fetchzip {
             url = "https://sourceforge.net/projects/mspgcc/files/msp430mcu/msp430mcu-${version}.tar.bz2";
@@ -149,41 +149,26 @@
           enableParallelBuilding = true;
         };
 
-        msp430-lib = pkgs.stdenv.mkDerivation {
-          pname = "msp430-lib";
-          version = pkgs.lib.concatStrings [msp430-mcu.version "-" msp430-libc.version];
-          nativeBuildInputs = [
-            msp430-libc
-            msp430-mcu
-          ];
-          dontUnpack = true;
-          installPhase = ''
-            mkdir -p $out/include $out/lib
-            cp -r ${msp430-mcu}/* $out/
-            cp -r ${msp430-libc}/msp430/* $out/
-          '';
-        };
-
         msp430-gcc = pkgs.stdenv.mkDerivation {
           pname = "msp430-gcc";
           inherit (msp430-gcc-unwrapped) version;
           nativeBuildInputs = with pkgs; [
             msp430-gcc-unwrapped
-            msp430-lib
+            msp430-libc
+            msp430mcu
             makeWrapper
           ];
           dontUnpack = true;
-          # TODO would be nice to not have to hardcode the specific ldscript
           installPhase = ''
-            mkdir -p $out/bin $out/include $out/lib/gcc $out/libexec
-
+            mkdir -p $out/lib $out/include $out/libexec $out/msp430/lib $out/msp430/include
             cp -r ${msp430-gcc-unwrapped}/lib/* $out/lib/
             cp -r ${msp430-gcc-unwrapped}/libexec/* $out/libexec/
-            cp -r ${msp430-lib}/* $out
-            cp ${msp430-lib}/lib/msp430mcu.spec $out/lib/gcc
+
+            cp -r ${msp430mcu}/* $out/msp430
+            cp -r ${msp430-libc}/msp430/* $out/msp430
 
             makeWrapper ${msp430-gcc-unwrapped}/bin/msp430-gcc $out/bin/msp430-gcc \
-              --add-flags "-isystem $out/include -L$out/lib -L$out/lib/ldscripts/msp430f1611" \
+              --add-flags "-isystem $out/include -L$out/lib" \
               --set GCC_EXEC_PREFIX $out/lib/gcc/ \
               --set LC_ALL C
           '';

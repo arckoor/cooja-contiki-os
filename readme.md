@@ -3,8 +3,6 @@ Nix wrapper for [Contiki](https://github.com/contiki-os/contiki) and Cooja.
 Very inspired by [bjoluc/docker-contiki](https://github.com/bjoluc/docker-contiki).
 The [cooja.patch](/nix/patches/cooja.patch) file was also copied from there.
 
-Currently only supports the `msp430f1611`.
-
 ## Usage
 Nix flake support is necessary.
 Note that `nix develop` might take a while on the first run, the GNU mirrors are quite slow.
